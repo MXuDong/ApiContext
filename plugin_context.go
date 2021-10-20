@@ -9,10 +9,12 @@ import (
 
 func NewContext() *ApiContext {
 	ctx := &ApiContext{
-		parentContext: nil,
-		childContexts: []*ApiContext{},
-		value:         map[interface{}]interface{}{},
-		valueLock:     &sync.RWMutex{},
+		parentContext:     nil,
+		childContexts:     []*ApiContext{},
+		value:             map[interface{}]interface{}{},
+		valueLock:         &sync.RWMutex{},
+		listenerDoneCount: 0,
+		listenerDoneChan:  make(chan struct{}),
 	}
 
 	return ctx
@@ -21,6 +23,8 @@ func NewContext() *ApiContext {
 // ApiContext is the context of 'Plugins' and 'Core-Apis', for invoke quickly.
 // ApiContext is not sync, because it will be invoked in one thread, if not, it needs to extend new context for invoke
 // in child threads.
+//
+// TODO: Add cancel and dead for context support
 type ApiContext struct {
 
 	// The parentContext value, the parent type only the ApiContext
@@ -32,6 +36,9 @@ type ApiContext struct {
 	value map[interface{}]interface{}
 	// the value lock, it can be provided outside
 	valueLock *sync.RWMutex
+
+	listenerDoneCount int
+	listenerDoneChan  chan struct{}
 
 	ApiError *ApiError
 }
@@ -60,10 +67,8 @@ func (a *ApiContext) CatchLastError() *ApiError {
 
 // QuickExtend like Extend, but it hasn't to copy the value from parent.
 func (a *ApiContext) QuickExtend() *ApiContext {
-	childContext := &ApiContext{
-		parentContext: a,
-		value:         map[interface{}]interface{}{},
-	}
+	childContext := NewContext()
+	childContext.parentContext = a
 
 	a.childContexts = append(a.childContexts, childContext) // unsafe of thread
 
@@ -75,9 +80,8 @@ func (a *ApiContext) Extend() *ApiContext {
 	a.valueLock.Lock()
 	defer a.valueLock.Unlock()
 
-	childContext := &ApiContext{
-		parentContext: a,
-	}
+	childContext := NewContext()
+	childContext.parentContext = a
 
 	a.childContexts = append(a.childContexts, childContext) // unsafe of thread
 
@@ -94,8 +98,19 @@ func (a *ApiContext) Deadline() (deadline time.Time, ok bool) {
 	panic("implement me")
 }
 
+func (a *ApiContext) complete(param struct{}) {
+	// should in once
+
+	go func(param struct{}) {
+		for i := 0; i < a.listenerDoneCount; i++ {
+			a.listenerDoneChan <- param
+		}
+	}(param)
+}
+
 func (a *ApiContext) Done() <-chan struct{} {
-	panic("implement me")
+	a.listenerDoneCount++
+	return a.listenerDoneChan
 }
 
 func (a *ApiContext) Err() error {
