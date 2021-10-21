@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
-	"time"
 )
 
+// NewContext return a new context instance
 func NewContext() *ApiContext {
 	ctx := &ApiContext{
 		parentContext:     nil,
@@ -15,6 +15,8 @@ func NewContext() *ApiContext {
 		valueLock:         &sync.RWMutex{},
 		listenerDoneCount: 0,
 		listenerDoneChan:  make(chan struct{}),
+		completeOnce:      &sync.Once{},
+		contextLock:       &sync.Mutex{},
 	}
 
 	return ctx
@@ -40,12 +42,19 @@ type ApiContext struct {
 	listenerDoneCount int
 	listenerDoneChan  chan struct{}
 
+	completeOnce *sync.Once // flag the complete, only can be invoked once
+
+	contextLock *sync.Mutex // the context's lock, for support thread-safe
+
 	ApiError *ApiError
 }
 
 // AppendError will append an error to err-struck, but error should in one tree, different error can't in one struck.
 // In other words, in different invoke struck, errors can't in one context.
 func (a *ApiContext) AppendError(info string, object interface{}, errType ErrorType) *ApiError {
+	a.contextLock.Lock()
+	defer a.contextLock.Unlock()
+
 	if a.ApiError == nil {
 		a.ApiError = NewApiError(info, object, errType)
 	} else {
@@ -60,6 +69,8 @@ func (a *ApiContext) CatchLastError() *ApiError {
 	if a.ApiError == nil {
 		return nil
 	}
+	a.contextLock.Lock()
+	defer a.contextLock.Unlock()
 	r := a.ApiError
 	a.ApiError = a.ApiError.LastLevelError
 	return r
@@ -78,6 +89,8 @@ func (a *ApiContext) QuickExtend() *ApiContext {
 // Extend will copy all the value from parent.
 func (a *ApiContext) Extend() *ApiContext {
 	a.valueLock.Lock()
+	a.contextLock.Lock()
+	defer a.contextLock.Unlock()
 	defer a.valueLock.Unlock()
 
 	childContext := NewContext()
@@ -94,13 +107,8 @@ func (a *ApiContext) Extend() *ApiContext {
 
 }
 
-func (a *ApiContext) Deadline() (deadline time.Time, ok bool) {
-	panic("implement me")
-}
-
 func (a *ApiContext) complete(param struct{}) {
-	// should in once
-
+	// todo: should in once
 	go func(param struct{}) {
 		for i := 0; i < a.listenerDoneCount; i++ {
 			a.listenerDoneChan <- param
