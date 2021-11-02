@@ -12,12 +12,13 @@ var (
 	ParamTypeError_ErrorType  ErrorType = "Param(s) type error"
 )
 
-func NewApiError(info string, object interface{}, errType ErrorType) *ApiError {
+func NewApiError(apiName, info string, object interface{}, errType ErrorType) *ApiError {
 	if len(errType) == 0 {
 		errType = Unknown_ErrorType
 	}
 
 	return &ApiError{
+		ErrorFunc:   apiName,
 		ErrorInfo:   info,
 		ErrorObject: object,
 		ErrorType:   errType,
@@ -25,6 +26,7 @@ func NewApiError(info string, object interface{}, errType ErrorType) *ApiError {
 }
 
 type ApiError struct {
+	ErrorFunc   string
 	ErrorOrigin error
 
 	ErrorInfo   string
@@ -36,14 +38,12 @@ type ApiError struct {
 }
 
 func (ae *ApiError) String() string {
-	// implement me
-	return ""
+	return ae.Error()
 }
 
 func (ae *ApiError) Error() string {
-	// implement me
 	if ae.ErrorOrigin == nil {
-		ae.ErrorOrigin = fmt.Errorf(ae.ErrorInfo+";Obj: %v", ae.ErrorObject)
+		ae.ErrorOrigin = fmt.Errorf("Api:[%s]:"+ae.ErrorInfo+";Obj: %v", ae.ErrorFunc, ae.ErrorObject)
 	}
 
 	if ae.LastLevelError != nil {
@@ -53,11 +53,13 @@ func (ae *ApiError) Error() string {
 	return ae.ErrorOrigin.Error()
 }
 
-func (ae *ApiError) WithStruck(info string, object interface{}, errType ErrorType) *ApiError {
+func (ae *ApiError) WithStruck(apiName, info string, object interface{}, errType ErrorType) *ApiError {
 	err := &ApiError{
-		ErrorInfo:   info,
-		ErrorObject: object,
-		ErrorType:   Unknown_ErrorType,
+		ErrorFunc:      apiName,
+		ErrorInfo:      info,
+		ErrorObject:    object,
+		ErrorType:      Unknown_ErrorType,
+		LastLevelError: ae,
 	}
 
 	if len(errType) != 0 {

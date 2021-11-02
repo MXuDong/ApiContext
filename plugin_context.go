@@ -6,11 +6,7 @@ import (
 	"sync"
 )
 
-var (
-	KeyFuncName = "__func_name__"
-
-	defaultFuncName = "AnonymousFunction"
-)
+var ()
 
 // NewContext return a new context instance
 func NewContext() *ApiContext {
@@ -61,6 +57,7 @@ type ApiFunc func(a *ApiContext)
 func (a *ApiContext) DoFuncWithName(name string, f ApiFunc) *ApiContext {
 	context := a.QuickExtend()
 	context.SetValue(KeyFuncName, name)
+	context.SetValue(KeyFuncType, FuncBlockType)
 	f(context)
 	return context
 }
@@ -69,6 +66,7 @@ func (a *ApiContext) DoFuncWithName(name string, f ApiFunc) *ApiContext {
 func (a *ApiContext) ConcurrentFuncWithName(name string, f ApiFunc) *ApiContext {
 	context := a.QuickExtend()
 	context.SetValue(KeyFuncName, name)
+	context.SetValue(KeyFuncType, FuncSyncType)
 	go f(context)
 	return context
 }
