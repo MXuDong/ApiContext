@@ -1,3 +1,3 @@
-module GoPlugin/Apis
+module plugins/api
 
 go 1.17
