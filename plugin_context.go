@@ -6,6 +6,12 @@ import (
 	"sync"
 )
 
+var (
+	KeyFuncName = "__func_name__"
+
+	defaultFuncName = "AnonymousFunction"
+)
+
 // NewContext return a new context instance
 func NewContext() *ApiContext {
 	ctx := &ApiContext{
@@ -17,6 +23,7 @@ func NewContext() *ApiContext {
 		listenerDoneChan:  make(chan struct{}),
 		completeOnce:      &sync.Once{},
 		contextLock:       &sync.Mutex{},
+		completeFlag:      false,
 	}
 
 	return ctx
@@ -42,11 +49,47 @@ type ApiContext struct {
 	listenerDoneCount int
 	listenerDoneChan  chan struct{}
 
-	completeOnce *sync.Once // flag the complete, only can be invoked once
-
-	contextLock *sync.Mutex // the context's lock, for support thread-safe
+	completeFlag bool
+	completeOnce *sync.Once  // flag the complete, only can be invoked once
+	contextLock  *sync.Mutex // the context's lock, for support thread-safe
 
 	ApiError *ApiError
+}
+
+type ApiFunc func(a *ApiContext)
+
+func (a *ApiContext) DoFuncWithName(name string, f ApiFunc) *ApiContext {
+	context := a.QuickExtend()
+	context.SetValue(KeyFuncName, name)
+	f(context)
+	return context
+}
+
+// ConcurrentFuncWithName will invoke new func as sync.
+func (a *ApiContext) ConcurrentFuncWithName(name string, f ApiFunc) *ApiContext {
+	context := a.QuickExtend()
+	context.SetValue(KeyFuncName, name)
+	go f(context)
+	return context
+}
+
+// DoFunc will start invoke a new func
+func (a *ApiContext) DoFunc(f ApiFunc) *ApiContext {
+	return a.DoFuncWithName(defaultFuncName, f)
+}
+
+func (a *ApiContext) ConcurrentFunc(f ApiFunc) *ApiContext {
+	return a.ConcurrentFuncWithName(defaultFuncName, f)
+}
+
+// Lock is context level lock, is so weight
+func (a *ApiContext) Lock() {
+	a.contextLock.Lock()
+}
+
+// Unlock the context
+func (a *ApiContext) Unlock() {
+	a.contextLock.Unlock()
 }
 
 // AppendError will append an error to err-struck, but error should in one tree, different error can't in one struck.
@@ -81,9 +124,11 @@ func (a *ApiContext) QuickExtend() *ApiContext {
 	childContext := NewContext()
 	childContext.parentContext = a
 
+	a.contextLock.Lock()
 	a.childContexts = append(a.childContexts, childContext) // unsafe of thread
+	a.contextLock.Unlock()
 
-	return a
+	return childContext
 }
 
 // Extend will copy all the value from parent.
@@ -107,16 +152,30 @@ func (a *ApiContext) Extend() *ApiContext {
 
 }
 
+// Complete if be invoked, it can't provide any operator. And all of this context's children will be completed.
+func (a *ApiContext) Complete() {
+	a.contextLock.Lock()
+	defer a.contextLock.Unlock()
+	for _, childContext := range a.childContexts {
+		childContext.Complete()
+	}
+	a.complete(struct{}{})
+}
+
 func (a *ApiContext) complete(param struct{}) {
-	// todo: should in once
-	go func(param struct{}) {
+	a.contextLock.Unlock()
+	defer a.contextLock.Unlock()
+	a.completeOnce.Do(func() {
+		a.completeFlag = true
 		for i := 0; i < a.listenerDoneCount; i++ {
 			a.listenerDoneChan <- param
 		}
-	}(param)
+	})
 }
 
 func (a *ApiContext) Done() <-chan struct{} {
+	a.contextLock.Lock()
+	defer a.contextLock.Unlock()
 	a.listenerDoneCount++
 	return a.listenerDoneChan
 }
