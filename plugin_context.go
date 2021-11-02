@@ -95,11 +95,12 @@ func (a *ApiContext) Unlock() {
 func (a *ApiContext) AppendError(info string, object interface{}, errType ErrorType) *ApiError {
 	a.contextLock.Lock()
 	defer a.contextLock.Unlock()
-
+	apiName, _ := a.StringValue(KeyFuncName)
 	if a.ApiError == nil {
-		a.ApiError = NewApiError(info, object, errType)
+
+		a.ApiError = NewApiError(apiName, info, object, errType)
 	} else {
-		a.ApiError = a.ApiError.WithStruck(info, object, errType)
+		a.ApiError = a.ApiError.WithStruck(apiName, info, object, errType)
 	}
 
 	return a.ApiError
@@ -230,7 +231,7 @@ func (a *ApiContext) Value(key interface{}) interface{} {
 // ================================= for type funcs
 
 // typeError return ApiError, only for build the type error
-func typeError(source interface{}, targetType string) *ApiError {
+func typeError(funcName string, source interface{}, targetType string) *ApiError {
 	typ := ""
 
 	if source == nil {
@@ -238,7 +239,7 @@ func typeError(source interface{}, targetType string) *ApiError {
 	} else {
 		typ = reflect.TypeOf(typ).Name()
 	}
-	return NewApiError(fmt.Sprintf("'%s' can't convert to '%s'", typ, targetType), source, TypeError_ErrorType)
+	return NewApiError(funcName, fmt.Sprintf("'%s' can't convert to '%s'", typ, targetType), source, TypeError_ErrorType)
 }
 
 // StringValue return target key as value string, if value can't convert to the string
@@ -248,7 +249,7 @@ func (a *ApiContext) StringValue(key interface{}) (string, *ApiError) {
 	if rString, ok := r.(string); ok {
 		return rString, nil
 	}
-	return "", typeError(r, reflect.String.String())
+	return "", typeError("StringValue", r, reflect.String.String())
 }
 
 func (a *ApiContext) BoolValue(key interface{}) (bool, *ApiError) {
@@ -256,7 +257,7 @@ func (a *ApiContext) BoolValue(key interface{}) (bool, *ApiError) {
 	if rBool, ok := r.(bool); ok {
 		return rBool, nil
 	}
-	return false, typeError(r, reflect.Bool.String())
+	return false, typeError("BoolValue", r, reflect.Bool.String())
 }
 
 func (a *ApiContext) IntValue(key interface{}) (int, *ApiError) {
@@ -264,7 +265,7 @@ func (a *ApiContext) IntValue(key interface{}) (int, *ApiError) {
 	if rInt, ok := r.(int); ok {
 		return rInt, nil
 	}
-	return 0, typeError(r, reflect.Int.String())
+	return 0, typeError("IntValue", r, reflect.Int.String())
 }
 
 func (a *ApiContext) Float32Value(key interface{}) (float32, *ApiError) {
@@ -272,5 +273,5 @@ func (a *ApiContext) Float32Value(key interface{}) (float32, *ApiError) {
 	if rFloat32, ok := r.(float32); ok {
 		return rFloat32, nil
 	}
-	return 0., typeError(r, reflect.Float32.String())
+	return 0., typeError("Float32Value", r, reflect.Float32.String())
 }
