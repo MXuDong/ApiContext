@@ -93,12 +93,10 @@ func (a *ApiContext) Unlock() {
 func (a *ApiContext) AppendError(info string, object interface{}, errType ErrorType) *ApiError {
 	a.contextLock.Lock()
 	defer a.contextLock.Unlock()
-	apiName, _ := a.StringValue(KeyFuncName)
 	if a.ApiError == nil {
-
-		a.ApiError = NewApiError(apiName, info, object, errType)
+		a.ApiError = NewApiError(a.FuncName(), info, object, errType)
 	} else {
-		a.ApiError = a.ApiError.WithStruck(apiName, info, object, errType)
+		a.ApiError = a.ApiError.WithStruck(a.FuncName(), info, object, errType)
 	}
 
 	return a.ApiError
