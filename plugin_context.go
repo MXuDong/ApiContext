@@ -102,6 +102,10 @@ func (a *ApiContext) AppendError(info string, object interface{}, errType ErrorT
 	return a.ApiError
 }
 
+func (a *ApiContext) AppendErrorE(err error) {
+	a.AppendError("", err, "Error")
+}
+
 // CatchLastError will return error and reset to last level error
 func (a *ApiContext) CatchLastError() *ApiError {
 	if a.ApiError == nil {
