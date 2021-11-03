@@ -6,8 +6,6 @@ import (
 	"sync"
 )
 
-var ()
-
 // NewContext return a new context instance
 func NewContext() *ApiContext {
 	ctx := &ApiContext{
@@ -148,7 +146,6 @@ func (a *ApiContext) Extend() *ApiContext {
 	}
 
 	return childContext
-
 }
 
 // Complete if be invoked, it can't provide any operator. And all of this context's children will be completed.
@@ -205,6 +202,21 @@ func (a *ApiContext) SetValue(key interface{}, v interface{}) {
 	defer a.valueLock.Unlock()
 
 	a.value[key] = v
+}
+
+func (a *ApiContext) WithValue(key, v interface{}) *ApiContext {
+	a.SetValue(key, v)
+	return a
+}
+
+func (a *ApiContext) WithFuncName(name string) *ApiContext {
+	a.SetValue(KeyFuncName, name)
+	return a
+}
+
+func (a *ApiContext) WithFuncType(typ string) *ApiContext {
+	a.SetValue(KeyFuncType, typ)
+	return a
 }
 
 // ValueParent will search value by key in current context.value first, if not exits, and is deep, will search
@@ -274,4 +286,12 @@ func (a *ApiContext) Float32Value(key interface{}) (float32, *ApiError) {
 		return rFloat32, nil
 	}
 	return 0., typeError("Float32Value", r, reflect.Float32.String())
+}
+
+func (a *ApiContext) FuncName() string {
+	funcName, err := a.StringValue(KeyFuncName)
+	if err != nil {
+		return UnknownFuncName
+	}
+	return funcName
 }
