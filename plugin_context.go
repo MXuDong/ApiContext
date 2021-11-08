@@ -88,6 +88,11 @@ func (a *ApiContext) Unlock() {
 	a.contextLock.Unlock()
 }
 
+// TODO: implement log-level output
+func (a *ApiContext) Output(value string) {
+	fmt.Println(value)
+}
+
 // AppendError will append an error to err-struck, but error should in one tree, different error can't in one struck.
 // In other words, in different invoke struck, errors can't in one context.
 func (a *ApiContext) AppendError(info string, object interface{}, errType ErrorType) *ApiError {
