@@ -155,6 +155,14 @@ func (a *ApiContext) Extend() *ApiContext {
 	return childContext
 }
 
+func (a *ApiContext) GetParentContext() *ApiContext {
+	return a.parentContext
+}
+
+func (a *ApiContext) GetChildrenContext() []*ApiContext {
+	return a.childContexts
+}
+
 // Complete if be invoked, it can't provide any operator. And all of this context's children will be completed.
 func (a *ApiContext) Complete() {
 	a.contextLock.Lock()
